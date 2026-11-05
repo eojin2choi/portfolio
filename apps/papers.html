@@ -1,0 +1,402 @@
+<title>DySample 재현 실험 결과</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground:#F6F8F7; --surface:#FFFFFF; --sunken:#EEF1F0;
+    --ink:#161A19; --ink-soft:#3A4341; --muted:#5C6360;
+    --line:#DCE2E0; --line-hi:#C3CCC9;
+    --baseline:#6B7E88; --signal:#0D6A60; --signal-w:#0D6A6014;
+    --delta:#A9540B; --delta-w:#A9540B14;
+    --null:#8A8F8C; --null-w:#8A8F8C14;
+    --radius:3px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:#0F1413; --surface:#161B1A; --sunken:#1B2120;
+      --ink:#E7EBE9; --ink-soft:#C2CAC7; --muted:#939D99;
+      --line:#262E2C; --line-hi:#38423F;
+      --baseline:#8A9AA3; --signal:#4ECFBA; --signal-w:#4ECFBA1A;
+      --delta:#E39D57; --delta-w:#E39D571A;
+      --null:#9AA3A0; --null-w:#9AA3A01A;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#0F1413; --surface:#161B1A; --sunken:#1B2120;
+    --ink:#E7EBE9; --ink-soft:#C2CAC7; --muted:#939D99;
+    --line:#262E2C; --line-hi:#38423F;
+    --baseline:#8A9AA3; --signal:#4ECFBA; --signal-w:#4ECFBA1A;
+    --delta:#E39D57; --delta-w:#E39D571A;
+    --null:#9AA3A0; --null-w:#9AA3A01A;
+  }
+
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif;
+    font-size:15px; line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:960px; margin:0 auto; padding:0 26px 90px; }
+
+  .eyebrow {
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:10.5px; font-weight:500; letter-spacing:0.16em;
+    text-transform:uppercase; color:var(--muted);
+  }
+  h1,h2,h3 { text-wrap:balance; margin:0; }
+  h1 { font-family:"Newsreader",Georgia,serif; font-weight:500;
+       font-size:clamp(32px,5vw,50px); line-height:1.06; letter-spacing:-0.015em; }
+  h2 { font-family:"Newsreader",Georgia,serif; font-weight:500;
+       font-size:clamp(23px,3vw,31px); line-height:1.15; }
+  h3 { font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10.5px;
+       letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); font-weight:500; }
+  p { margin:0; max-width:68ch; }
+  code, .mono { font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+  code { font-size:0.87em; background:var(--sunken); border:1px solid var(--line);
+         border-radius:var(--radius); padding:1px 5px; }
+
+  header { padding:68px 0 34px; border-bottom:1px solid var(--line); display:grid; gap:18px; }
+  header .lede { color:var(--ink-soft); font-size:17px; }
+
+  .verdict-banner {
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+  }
+  .badge {
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11px;
+    letter-spacing:0.08em; padding:4px 12px; border-radius:999px;
+    border:1px solid var(--line-hi); color:var(--muted); white-space:nowrap;
+  }
+  .badge.key { color:var(--null); border-color:var(--null); background:var(--null-w); font-weight:600; }
+  .badge.cost { color:var(--delta); border-color:var(--delta); background:var(--delta-w); font-weight:600; }
+  .badge.win { color:var(--signal); border-color:var(--signal); background:var(--signal-w); font-weight:600; }
+
+  section { padding-top:56px; display:grid; gap:18px; }
+
+  /* 설정 */
+  .setup { display:grid; gap:1px; background:var(--line); border:1px solid var(--line);
+           border-radius:var(--radius); overflow:hidden; }
+  .setup .r { background:var(--surface); display:grid; grid-template-columns:150px 1fr;
+              gap:16px; padding:10px 18px; align-items:baseline; }
+  .setup .f { font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11px;
+              letter-spacing:0.06em; color:var(--muted); }
+  .setup .v { font-size:14px; }
+  .setup .r.var { background:var(--signal-w); }
+  .setup .r.var .v { color:var(--signal); font-weight:600; }
+
+  /* 결과표 */
+  .table-scroll { overflow-x:auto; border:1px solid var(--line);
+                  border-radius:var(--radius); background:var(--surface); }
+  table { border-collapse:collapse; width:100%; min-width:600px; }
+  th,td { text-align:left; padding:11px 15px; border-bottom:1px solid var(--line); font-size:13.5px; }
+  th { font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10.5px;
+       letter-spacing:0.1em; text-transform:uppercase; color:var(--muted);
+       font-weight:500; background:var(--sunken); }
+  tbody tr:last-child td { border-bottom:none; }
+  td.num { font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums;
+           white-space:nowrap; }
+  td.n { font-family:"IBM Plex Mono",ui-monospace,monospace; color:var(--muted); }
+  td.diff { font-family:"IBM Plex Mono",ui-monospace,monospace; font-weight:600;
+            font-variant-numeric:tabular-nums; }
+  td.diff.neg { color:var(--delta); }
+  td.diff.nil { color:var(--null); }
+  td.diff.pos { color:var(--signal); }
+
+  .caption { font-size:12.5px; color:var(--muted); max-width:66ch; }
+
+  /* 핵심 발견 */
+  .finding {
+    border:1px solid var(--line); border-left:3px solid var(--delta);
+    border-radius:var(--radius); background:var(--surface);
+    padding:22px 26px; display:grid; gap:10px;
+  }
+  .finding .q { font-family:"Newsreader",Georgia,serif; font-size:19px; line-height:1.4; }
+  .finding p { font-size:14px; color:var(--ink-soft); }
+
+  /* 가설 반증 */
+  .hypothesis { display:grid; grid-template-columns:1fr 1fr; gap:1px;
+                background:var(--line); border:1px solid var(--line);
+                border-radius:var(--radius); overflow:hidden; }
+  .hypothesis > div { background:var(--surface); padding:20px 22px; display:grid; gap:8px; }
+  .hypothesis .k { font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10px;
+                   letter-spacing:0.12em; text-transform:uppercase; }
+  .hypothesis .guess .k { color:var(--baseline); }
+  .hypothesis .truth .k { color:var(--delta); }
+  .hypothesis .truth { box-shadow:inset 3px 0 0 var(--delta); }
+  .hypothesis p { font-size:13.5px; }
+
+  .offsets { background:var(--sunken); border:1px solid var(--line);
+             border-radius:var(--radius); padding:16px 20px; display:grid; gap:4px; }
+  .offsets .row { display:grid; grid-template-columns:60px 1fr auto;
+                  gap:14px; font-family:"IBM Plex Mono",ui-monospace,monospace;
+                  font-size:12.5px; font-variant-numeric:tabular-nums; align-items:center; }
+  .offsets .bar { height:7px; background:var(--line-hi); border-radius:2px; position:relative; }
+  .offsets .bar span { position:absolute; inset:0 auto 0 0; background:var(--delta); border-radius:2px; }
+  .offsets .lab { color:var(--muted); }
+
+  ul.list { margin:0; padding-left:18px; display:grid; gap:9px; }
+  ul.list li { font-size:14px; color:var(--ink-soft); max-width:66ch; }
+  ul.list li::marker { color:var(--baseline); }
+  ul.list li strong { color:var(--ink); }
+
+  .honest { border:1px solid var(--line); border-radius:var(--radius);
+            background:var(--sunken); padding:20px 24px; display:grid; gap:10px; }
+  .honest p { font-size:13.5px; color:var(--ink-soft); }
+
+  @media (max-width:720px) {
+    .wrap { padding:0 16px 70px; }
+    .hypothesis { grid-template-columns:1fr; }
+    .setup .r { grid-template-columns:1fr; gap:3px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation:none!important; transition:none!important; } }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Phase 3 · 재현 실험 · 2026-08-27</div>
+    <h1>256px에서는 안 보이고<br>512px에서는 보인다</h1>
+    <p class="lede">
+      DySample(ICCV 2023, 인용 711)을 Oxford-IIIT Pet에 직접 붙여 bilinear와 30번 비교했다.
+      256px에서는 <strong>어떤 데이터 규모에서도 이득이 없었다.</strong>
+      해상도를 512로 올리자 <strong>seed 다섯 개 전부에서 같은 방향의 향상</strong>이 나타났다.
+      다만 그 크기는 +0.18%로 매우 작고, 비용 구조는 반대 방향으로 움직였다.
+    </p>
+    <div class="verdict-banner">
+      <span class="badge key">256px · 2/3승 · 효과크기 0.42</span>
+      <span class="badge win">512px · 5/5승 · 효과크기 1.71</span>
+      <span class="badge cost">오버헤드 +41% → +15%</span>
+      <span class="badge">34 run</span>
+      <span class="badge mono">arXiv 2308.15085</span>
+    </div>
+  </header>
+
+  <section>
+    <h3>한눈에</h3>
+    <h2>해상도가 결론을 바꿨다</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>해상도</th><th>mIoU 차이 (paired)</th><th>proposed 승</th><th>효과 크기</th><th>latency 오버헤드</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="n">256px</td>
+            <td class="num">+0.0004 ± 0.0009</td>
+            <td class="num">2 / 3</td>
+            <td class="diff nil">0.42</td>
+            <td class="diff neg">+41%</td>
+          </tr>
+          <tr>
+            <td class="n">512px</td>
+            <td class="num">+0.0014 ± 0.0008</td>
+            <td class="num">5 / 5</td>
+            <td class="diff pos">1.71</td>
+            <td class="diff nil">+15%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">
+      효과 크기 = seed별 차이의 평균 ÷ 표준편차. 같은 seed끼리 짝지어 비교했다.
+      256px는 방향조차 엇갈렸고(한 seed는 baseline 승), 512px는 다섯 개 모두 같은 방향이었다.
+      5/5는 부호검정 p=0.031로 5% 수준에서 유의하다. 방향은 확실하다는 뜻이지,
+      크기가 크다는 뜻은 아니다 — +0.0014는 mIoU 0.79 위에서 +0.18%다.
+    </p>
+  </section>
+
+  <section>
+    <h3>실험 설정</h3>
+    <h2>무엇을 통제했나</h2>
+    <div class="setup">
+      <div class="r var"><span class="f">유일한 변수</span><span class="v">업샘플러 — bilinear vs DySample</span></div>
+      <div class="r"><span class="f">데이터</span><span class="v">Oxford-IIIT Pet · 3클래스(pet / background / boundary) · 논문이 쓰지 않은 데이터</span></div>
+      <div class="r"><span class="f">모델</span><span class="v">ResNet-18(ImageNet) + FPN 디코더 128ch · 업샘플 3단계</span></div>
+      <div class="r"><span class="f">해상도</span><span class="v">256 × 256</span></div>
+      <div class="r"><span class="f">학습량</span><span class="v">전 규모 <strong>1,000 업데이트로 고정</strong> · AdamW lr 3e-4 · batch 8</span></div>
+      <div class="r"><span class="f">평가</span><span class="v">test 800장 고정 · 규모와 무관</span></div>
+      <div class="r"><span class="f">seed</span><span class="v">0, 1, 2 → 평균 ± 표준편차</span></div>
+    </div>
+    <p class="caption">
+      학습량을 epoch가 아니라 <strong>총 업데이트 횟수</strong>로 고정한 게 핵심이다.
+      epoch를 고정하면 데이터가 줄 때 업데이트도 함께 줄어서, 성능이 떨어져도
+      "데이터가 적어서"인지 "학습을 덜 해서"인지 분리할 수 없다.
+    </p>
+  </section>
+
+  <section>
+    <h3>결과</h3>
+    <h2>데이터를 10분의 1로 줄여도 그대로였다</h2>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>n_train</th><th>baseline (bilinear)</th><th>proposed (DySample)</th><th>절대</th><th>상대</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="n">2,000</td><td class="num">0.7841 ± 0.0015</td><td class="num">0.7845 ± 0.0014</td><td class="diff nil">+0.0004</td><td class="diff nil">+0.05%</td></tr>
+          <tr><td class="n">1,000</td><td class="num">0.7808 ± 0.0020</td><td class="num">0.7789 ± 0.0009</td><td class="diff neg">−0.0019</td><td class="diff neg">−0.25%</td></tr>
+          <tr><td class="n">500</td><td class="num">0.7694 ± 0.0026</td><td class="num">0.7684 ± 0.0012</td><td class="diff neg">−0.0010</td><td class="diff neg">−0.13%</td></tr>
+          <tr><td class="n">200</td><td class="num">0.7555 ± 0.0003</td><td class="num">0.7544 ± 0.0012</td><td class="diff neg">−0.0011</td><td class="diff neg">−0.15%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">지표: mIoU. 향상 폭이 seed 간 표준편차보다 작다 — 노이즈와 구분되지 않는다.</p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>n_train</th><th>baseline · boundary IoU</th><th>proposed · boundary IoU</th><th>절대</th><th>상대</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="n">2,000</td><td class="num">0.5592 ± 0.0035</td><td class="num">0.5597 ± 0.0028</td><td class="diff nil">+0.0004</td><td class="diff nil">+0.08%</td></tr>
+          <tr><td class="n">1,000</td><td class="num">0.5547 ± 0.0035</td><td class="num">0.5526 ± 0.0004</td><td class="diff neg">−0.0021</td><td class="diff neg">−0.38%</td></tr>
+          <tr><td class="n">500</td><td class="num">0.5409 ± 0.0054</td><td class="num">0.5397 ± 0.0034</td><td class="diff neg">−0.0012</td><td class="diff neg">−0.22%</td></tr>
+          <tr><td class="n">200</td><td class="num">0.5210 ± 0.0025</td><td class="num">0.5218 ± 0.0009</td><td class="diff nil">+0.0008</td><td class="diff nil">+0.15%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">
+      boundary를 별도 클래스로 둔 건 의도적이었다. 업샘플러 차이는 경계에서 가장 크게
+      나타나야 하므로, 차이가 드러날 자리를 미리 만들어 둔 것이다. 거기서도 나오지 않았다.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>비용</th><th>baseline</th><th>proposed</th><th>차이</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>추론 지연 · 256px</td><td class="num">5.10 ms</td><td class="num">7.21 ms</td><td class="diff neg">+41%</td></tr>
+          <tr><td>추론 지연 · 512px</td><td class="num">6.75 ms</td><td class="num">7.74 ms</td><td class="diff nil">+15%</td></tr>
+          <tr><td>업샘플러 파라미터</td><td class="num">0</td><td class="num">4,128 × 3층</td><td class="diff neg">+12,384</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">
+      비용 구조가 해상도에 따라 뒤집힌다. 저해상도에서는 conv 연산이 작아서 DySample의
+      추가 비용이 그대로 드러나고, 고해상도에서는 conv가 지배적이 되어 묻힌다.
+      논문의 "ultra-lightweight" 주장은 <strong>고해상도 dense prediction을 전제로 할 때</strong> 성립한다.
+    </p>
+  </section>
+
+  <section>
+    <h3>해상도 512</h3>
+    <h2>같은 실험, 해상도만 두 배</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>지표</th><th>baseline</th><th>proposed</th><th>절대</th><th>상대</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>mIoU (paired, seed 5회)</td><td class="num">0.7937 기준</td><td class="num">+0.0014 ± 0.0008</td><td class="diff pos">5/5 승</td><td class="diff pos">+0.18%</td></tr>
+          <tr><td>boundary IoU (paired)</td><td class="num">0.5843 기준</td><td class="num">+0.0012 ± 0.0013</td><td class="diff pos">5/5 승</td><td class="diff pos">+0.21%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">n=2,000 · seed 0~4 · 학습량 1,000 업데이트 고정 · 그 외 256px 실험과 동일.</p>
+
+    <div class="offsets">
+      <div class="row"><span class="lab">seed</span><span class="lab">baseline → proposed (mIoU)</span><span class="lab">차이</span></div>
+      <div class="row"><span>0</span><span>0.7950 → 0.7954</span><span>+0.0005</span></div>
+      <div class="row"><span>1</span><span>0.7943 → 0.7966</span><span>+0.0024</span></div>
+      <div class="row"><span>2</span><span>0.7941 → 0.7959</span><span>+0.0018</span></div>
+      <div class="row"><span>3</span><span>0.7921 → 0.7941</span><span>+0.0020</span></div>
+      <div class="row"><span>4</span><span>0.7932 → 0.7939</span><span>+0.0006</span></div>
+    </div>
+    <p class="caption">
+      256px에서는 seed 2에서 baseline이 이겨 방향이 엇갈렸다. 512px에서는 셋 다 같은 방향이다.
+      두 arm의 절대 성능이 함께 올랐다는 점도 같이 봐야 한다 — 0.784 → 0.794.
+    </p>
+  </section>
+
+  <section>
+    <h3>진단</h3>
+    <h2>내 첫 가설은 틀렸다</h2>
+
+    <div class="hypothesis">
+      <div class="guess">
+        <div class="k">내 예상</div>
+        <p>
+          DySample의 offset conv는 <code>std=0.001</code>로 초기화된다.
+          학습 시작 시점엔 bilinear와 사실상 같은 동작이다.
+          1,000 업데이트는 적으니 오프셋이 거의 안 움직였을 것이고,
+          그래서 두 arm이 같은 결과를 낸 것이다.
+        </p>
+      </div>
+      <div class="truth">
+        <div class="k">실제 측정 결과</div>
+        <p>
+          오프셋은 <strong>27~176배</strong>로 커졌다.
+          샘플 위치가 bilinear 기준 위치의 <strong>12~24%</strong>만큼 이동했다.
+          모듈은 제대로 작동하고 있었다. 학습량 부족이 원인이 아니다.
+        </p>
+      </div>
+    </div>
+
+    <div class="offsets">
+      <div class="row"><span class="lab">층</span><span class="lab">학습 후 이동량 (bilinear 기준 대비)</span><span class="lab">배율</span></div>
+      <div class="row"><span>0</span><span class="bar"><span style="width:71.6%"></span></span><span>17.9% · 27배</span></div>
+      <div class="row"><span>1</span><span class="bar"><span style="width:48.6%"></span></span><span>12.1% · 46배</span></div>
+      <div class="row"><span>2</span><span class="bar"><span style="width:96.8%"></span></span><span>24.2% · 176배</span></div>
+    </div>
+    <p class="caption">
+      막대는 세 층 중 최대치(24.2%)를 기준으로 정규화했다.
+      측정 코드는 <code>src/experiment/diagnose_offset.py</code>.
+    </p>
+
+    <div class="finding">
+      <div class="q">그렇다면 왜 성능이 오르지 않았나?</div>
+      <p>
+        남은 설명은 <strong>병목이 업샘플링이 아니었다</strong>는 것이다.
+        Pet은 클래스가 셋뿐이고 객체가 크다. ImageNet 사전학습 ResNet-18만으로도
+        baseline이 이미 mIoU 0.78, pixel accuracy 0.93에 도달한다.
+        업샘플 경로를 아무리 정교하게 만들어도, 전체 성능을 잡고 있는 게
+        그쪽이 아니면 총점은 움직이지 않는다.
+      </p>
+      <p>
+        논문이 검증한 ADE20K(150클래스)·COCO는 장면이 복잡하고 작은 객체가 많다.
+        거기서는 업샘플 품질이 실제 병목일 수 있다. 이건 논문과 모순되는 결과가 아니라
+        <strong>적용 범위에 관한 결과</strong>다.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h3>이 실험이 말할 수 있는 것과 없는 것</h3>
+    <h2>선을 분명히 긋기</h2>
+
+    <div class="honest">
+      <p><strong>말할 수 있는 것</strong></p>
+      <ul class="list">
+        <li><strong>256px에서는 이득이 없었다.</strong> 데이터를 2,000에서 200으로 줄여도 마찬가지였고, seed 방향조차 엇갈렸다(2/3).</li>
+        <li><strong>512px에서는 방향이 확실하다.</strong> seed 다섯 개 모두 proposed가 이겼다(p=0.031). 다만 크기는 +0.18%로 매우 작다.</li>
+        <li><strong>비용은 해상도에 따라 뒤집힌다.</strong> 오버헤드가 256px에서 +41%, 512px에서 +15%였다. 논문의 "ultra-lightweight"는 고해상도를 전제로 한 말이다.</li>
+        <li><strong>오프셋은 정상 학습됐다.</strong> 27~176배 커져 샘플 위치가 기준의 12~24%까지 이동했다. 구현이나 학습량의 문제가 아니다.</li>
+      </ul>
+      <p><strong>말할 수 없는 것</strong></p>
+      <ul class="list">
+        <li><strong>논문이 틀렸다는 것.</strong> 논문 설정(대형 벤치마크, 긴 스케줄, 다른 디코더)을 재현한 게 아니다. 오히려 512px 결과는 논문 방향과 일치한다.</li>
+        <li><strong>이 향상이 쓸 만하다는 것.</strong> +0.18%를 얻으려고 지연을 15% 더 쓸지는 과제가 정할 문제다. 이 실험은 그 판단의 재료일 뿐이다.</li>
+        <li><strong>512px가 상한이라는 것.</strong> 256 → 512에서 신호가 커졌다면 768, 1024에서는 더 커질 수도 있다. 확인하지 않았다.</li>
+        <li><strong>1,000 업데이트가 충분하다는 것.</strong> 오프셋이 움직인 건 봤지만 수렴했는지는 보지 않았다.</li>
+      </ul>
+  </section>
+
+  <section>
+    <h3>다음</h3>
+    <h2>가설을 좁히는 세 갈래</h2>
+    <ul class="list">
+      <li><strong>768px로 한 번 더 올린다.</strong> 256 → 512에서 효과 크기가 0.42 → 1.71로 움직였다. 이 추세가 이어지는지가 가장 싼 다음 질문이다.</li>
+      <li><strong>더 어려운 데이터로 바꾼다.</strong> ADE20K 서브셋. 클래스가 많고 작은 객체가 있으면 업샘플 품질이 실제 병목이 될 수 있다.</li>
+      <li><strong>디코더 채널을 줄인다.</strong> 병목을 인위적으로 업샘플 경로로 옮겨, "병목일 때는 이득이 커지는가"를 직접 시험한다.</li>
+      <li><strong>데이터 규모 축을 512px에서 다시 본다.</strong> 지금 512px는 n=2,000 하나뿐이다. 256px에서 얻은 "규모와 무관하다"는 결론이 고해상도에서도 유지되는지는 모른다.</li>
+    </ul>
+    <p class="caption">
+      실험 전체는 <code>python -m src.experiment.run_dysample --report --size 512</code> 로 재생산할 수 있다.
+      34 run의 결과가 SQLite에 행 단위로 남아 있고, 비교 수치는 전부 <code>v_comparison</code> 뷰가 계산한다.
+    </p>
+  </section>
+
+</div>

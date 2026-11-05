@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 회화 친구</title>
+<style>
+  :root {
+    --bg: #f6f7fb; --card: #ffffff; --ink: #1f2937; --mute: #6b7280;
+    --ai: #ffffff; --me: #2f6f5e; --me-ink: #ffffff; --accent: #e8743b; --line: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font-family: "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif; }
+  .app { max-width: 480px; margin: 0 auto; height: 100dvh; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--card);
+           border-bottom: 1px solid var(--line); }
+  .face { width: 52px; height: 52px; border-radius: 50%; background: #fde7d9; display: grid;
+          place-items: center; font-size: 30px; flex: none; transition: transform .2s; }
+  .face.talking { transform: scale(1.08); }
+  .who { flex: 1; min-width: 0; }
+  .who b { display: block; font-size: 17px; }
+  .who span { color: var(--mute); font-size: 13px; }
+  .icon-btn { border: 0; background: none; font-size: 22px; padding: 6px; cursor: pointer; }
+  #chat { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 85%; padding: 10px 14px; border-radius: 16px; line-height: 1.45; }
+  .msg.ai { background: var(--ai); align-self: flex-start; border: 1px solid var(--line); }
+  .msg.me { background: var(--me); color: var(--me-ink); align-self: flex-end; }
+  .msg .say { font-size: 19px; }
+  .msg .ko { font-size: 13px; color: var(--mute); margin-top: 4px; }
+  .msg .repeat { margin-top: 8px; padding: 8px 10px; background: #fff4ec; border-radius: 10px; font-size: 17px; }
+  .msg .hidden-text { color: var(--mute); font-size: 14px; }
+  .msg .replay { border: 0; background: none; cursor: pointer; font-size: 15px; padding: 0 0 0 6px; }
+  .note { align-self: center; color: var(--mute); font-size: 13px; text-align: center; }
+  footer { background: var(--card); border-top: 1px solid var(--line); padding: 12px 16px 16px; }
+  .langs { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }
+  .langs button { border: 1px solid var(--line); background: var(--bg); border-radius: 999px;
+                  padding: 6px 14px; font-size: 14px; cursor: pointer; }
+  .langs button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .row { display: flex; align-items: center; gap: 10px; }
+  #mic { width: 76px; height: 76px; border-radius: 50%; border: 0; background: var(--accent); color: #fff;
+         font-size: 34px; cursor: pointer; flex: none; }
+  #mic.listening { background: #c2410c; box-shadow: 0 0 0 8px rgba(232,116,59,.25); }
+  #mic:disabled { background: #d1d5db; cursor: not-allowed; }
+  #text { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; font-size: 15px; }
+  .small-btn { border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 10px 12px;
+               font-size: 14px; cursor: pointer; }
+  /* 설정 */
+  #settings { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; }
+  #settings.open { display: block; }
+  .sheet { max-width: 480px; margin: 0 auto; height: 100dvh; overflow-y: auto; background: var(--card); padding: 18px 16px 30px; }
+  .sheet h2 { margin: 0 0 4px; font-size: 20px; }
+  .sheet h3 { margin: 20px 0 8px; font-size: 15px; }
+  .sheet label { display: block; font-size: 13px; color: var(--mute); margin: 10px 0 4px; }
+  .sheet input, .sheet select { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; }
+  .sheet .check { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 15px; }
+  .sheet .check input { width: auto; }
+  .sheet .hint { font-size: 12px; color: var(--mute); margin-top: 4px; }
+  .sheet .actions { display: flex; gap: 8px; margin-top: 20px; }
+  .sheet .actions button { flex: 1; padding: 12px; border-radius: 12px; border: 0; font-size: 15px; cursor: pointer; }
+  .primary { background: var(--ink); color: #fff; }
+  .ghost { background: var(--bg); color: var(--ink); }
+  #demoBar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 16px;
+             background: #fff4ec; border-bottom: 1px solid var(--line); font-size: 13px; }
+  #demoBar button { border: 0; background: var(--accent); color: #fff; border-radius: 999px; padding: 6px 12px;
+                    font-size: 13px; cursor: pointer; flex: none; }
+  #demoHint { display: flex; justify-content: center; margin-bottom: 8px; }
+  #demoHint:empty { display: none; }
+  #demoHint button { border: 1px dashed var(--accent); background: var(--card); color: var(--ink); border-radius: 999px;
+                     padding: 6px 12px; font-size: 14px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="face" id="face">🙂</div>
+    <div class="who"><b id="friendName">Emma</b><span id="sub">언어 연습을 돕는 AI 친구</span></div>
+    <button class="icon-btn" id="endBtn" title="오늘 끝내기">🏁</button>
+    <button class="icon-btn" id="openSettings" title="설정">⚙️</button>
+  </header>
+
+  <div id="chat"></div>
+
+  <footer>
+    <div class="langs">
+      <button id="langKo" class="on">한국어로 말하기</button>
+      <button id="langTarget">영어로 말하기</button>
+    </div>
+    <div class="row">
+      <button id="mic" title="누르고 말하기">🎤</button>
+      <input id="text" placeholder="또는 여기에 입력">
+      <button class="small-btn" id="sendBtn">보내기</button>
+    </div>
+  </footer>
+</div>
+
+<div id="settings">
+  <div class="sheet">
+    <h2>내 사용설명서</h2>
+    <div class="hint">칸만 채우면 나머지는 AI 친구가 맞춰 줘요. 이 기기 안에만 저장돼요.</div>
+
+    <label>나는</label>
+    <select id="s_who"><option>성인</option><option>아이</option></select>
+    <label>나이</label>
+    <input id="s_age" type="number" min="3" max="99">
+    <label>배울 언어</label>
+    <select id="s_lang"></select>
+    <label>지금 수준</label>
+    <select id="s_level">
+      <option>완전 처음</option><option>단어 몇 개 앎</option><option>짧은 대화 됨</option><option>일상 대화 됨</option>
+    </select>
+    <label>좋아하는 것</label>
+    <input id="s_likes" placeholder="예: 축구, 요리, 여행, 게임, 기차">
+    <label>하루에 쓸 시간(분)</label>
+    <input id="s_minutes" type="number" min="1" max="240">
+    <label>친구 이름</label>
+    <input id="s_name" placeholder="예: Emma">
+    <label>친구 성격</label>
+    <input id="s_persona" placeholder="예: 차분하고 다정함">
+    <label>따라 말하기</label>
+    <select id="s_repeat"><option>적게</option><option>보통</option><option>많이</option></select>
+
+    <h3>듣기·보기</h3>
+    <label>말 속도 (원어민 = 1.0)</label>
+    <input id="s_rate" type="number" step="0.01" min="0.5" max="1.2">
+    <label class="check"><input id="s_showKo" type="checkbox"> 한국어 뜻 보이기</label>
+    <label class="check"><input id="s_soundFirst" type="checkbox"> 소리가 먼저, 글자는 다 들은 뒤에 보이기</label>
+
+    <h3>AI 연결</h3>
+    <label>AI 회사</label>
+    <select id="s_provider">
+      <option value="gemini">Google Gemini (무료 키 있음)</option>
+      <option value="claude">Anthropic Claude</option>
+      <option value="openai">OpenAI</option>
+    </select>
+    <label>모델</label>
+    <input id="s_model">
+    <div class="hint" id="modelHint"></div>
+    <label>API 키</label>
+    <input id="s_key" type="password" autocomplete="off">
+    <div class="hint">키는 파일이 아니라 이 브라우저에만 저장돼요. 나 혼자 쓰는 용도예요. 결제 계정에 한 달 사용 한도를 꼭 걸어 두세요.</div>
+
+    <div class="actions">
+      <button class="ghost" id="resetChat">대화 지우기</button>
+      <button class="primary" id="saveSettings">저장하고 시작</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const LANGS = {
+  "영어": "en-US", "일본어": "ja-JP", "스페인어": "es-ES", "중국어": "zh-CN",
+  "프랑스어": "fr-FR", "독일어": "de-DE", "베트남어": "vi-VN"
+};
+const MODELS = {
+  gemini: { model: "gemini-2.5-flash-lite", hint: "Google AI Studio에서 무료 키를 받을 수 있어요(하루 사용량 제한, 무료 쪽 대화는 서비스 개선에 쓰일 수 있음)." },
+  claude: { model: "claude-haiku-4-5-20251001", hint: "console.anthropic.com에서 키를 받아요." },
+  openai: { model: "gpt-4o-mini", hint: "platform.openai.com에서 키를 받아요." }
+};
+const DEFAULTS = {
+  who: "성인", age: "", lang: "영어", level: "단어 몇 개 앎", likes: "", minutes: 15,
+  name: "Emma", persona: "차분하고 다정함", repeat: "보통",
+  rate: 0.88, showKo: true, soundFirst: false,
+  provider: "gemini", model: MODELS.gemini.model, key: ""
+};
+
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+
+let S = Object.assign({}, DEFAULTS, store.get("aifriend.settings", {}));
+let history = store.get("aifriend.history", []);   // [{role:"user"|"assistant", content:string}]
+let micLang = "ko";
+let busy = false;
+
+// ---------- 시스템 지시 ----------
+function systemPrompt() {
+  const L = S.lang, N = S.name || "친구";
+  const repeatRule = { "적게": "가끔만", "보통": "자주(매번은 말고)", "많이": "거의 매번" }[S.repeat];
+  let p = `[내 사용설명서]
+- 나는: ${S.who} · 나이: ${S.age || "미입력"}살
+- 모국어: 한국어
+- 배울 언어: ${L}
+- 지금 수준: ${S.level}
+- 좋아하는 것: ${S.likes || "미입력"}
+- 하루에 쓸 시간: ${S.minutes}분
+- 친구 이름·성격: ${N}, ${S.persona || "다정함"}
+- 따라 말하기: ${S.repeat}
+
+[대화 설정]
+너는 위 사용설명서의 사람과 ${L}로 수다 떠는 친구 ${N}이야. 선생님 말고 친구처럼 말해 줘.
+
+1. 한 번에 한 가지 이야기만: 방금 내가 한 말에 대해서.
+2. 한 번에 짧은 문장 두 개까지(한 문장에 8단어쯤). 반응하고 → 쉬운 질문 하나, 또는 따라 말할 문장 하나. 둘을 한꺼번에 하지는 마.
+3. 내가 한국어로 말하면 알아듣고 ${L}로 쉽게 대답해. 그리고 ${repeatRule} 내 말을 그 언어 문장으로 바꿔서 따라 말하게 해 줘.
+4. 따라 말할 문장은 이렇게: 한 단어 반응 → 짧은 한국어 신호("따라 해 볼까?", "이렇게 말해 볼래?") → 큰따옴표 안에 문장. 그리고 기다려.
+5. 한국어는 그 짧은 신호, 또는 내가 뜻을 물어볼 때만 써.
+6. 어떤 대답이든 괜찮아. 한 단어여도, 틀려도. 칭찬은 한 단어로. 점수·문법 설명·발음 지적은 하지 마.
+7. 내 수준과 좋아하는 것에 맞춰 말해. 이야깃거리가 떨어질 때만 좋아하는 것을 꺼내.
+8. 내가 ${L}로 대답하기 시작하면 한국어 도움을 조금씩 줄여.
+9. 끝낼 때 오늘 같이 쓴 문장을 3개까지 정리해 주고, 하나를 써 보라고 해. 내가 써서 보내면 부드럽게 고쳐 줘.
+10. 사람인 척하지 마. 물어보면 "언어 연습을 돕는 AI 친구"라고 해. 주소·학교·연락처·비밀번호는 묻지 마.
+처음엔 네가 먼저 짧게 인사하고, 오늘 하루가 어땠는지 하나만 물어봐.`;
+  if (S.who === "아이") {
+    p += `\n아이와 이야기 중이야. 이름·학교·주소 같은 개인정보는 묻지 말고, 무섭거나 어른 이야기는 하지 마.`;
+  }
+  p += `
+
+[출력 형식]
+반드시 JSON 하나만 출력해. 다른 글자는 쓰지 마.
+{"say": "${L} 문장(한국어 신호가 있으면 함께)", "ko": "say의 한국어 뜻", "repeat": "따라 말할 짧은 ${L} 문장, 없으면 빈 문자열"}`;
+  return p;
+}
+
+// ---------- AI 호출 ----------
+async function callAI(messages) {
+  const sys = systemPrompt();
+  if (!S.key) return demoReply(messages);
+
+  if (S.provider === "gemini") {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(S.model)}:generateContent`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-goog-api-key": S.key },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: sys }] },
+        contents: messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+        generationConfig: { responseMimeType: "application/json", temperature: 0.8 }
+      })
+    });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error?.message || res.status);
+    return j.candidates?.[0]?.content?.parts?.map(p => p.text).join("") || "";
+  }
+
+  if (S.provider === "claude") {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": S.key,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({ model: S.model, max_tokens: 400, system: sys, messages })
+    });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error?.message || res.status);
+    return j.content?.filter(b => b.type === "text").map(b => b.text).join("") || "";
+  }
+
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", "authorization": `Bearer ${S.key}` },
+    body: JSON.stringify({
+      model: S.model, response_format: { type: "json_object" },
+      messages: [{ role: "system", content: sys }, ...messages]
+    })
+  });
+  const j = await res.json();
+  if (!res.ok) throw new Error(j.error?.message || res.status);
+  return j.choices?.[0]?.message?.content || "";
+}
+
+function parseReply(text) {
+  const m = text.match(/\{[\s\S]*\}/);
+  try {
+    const o = JSON.parse(m ? m[0] : text);
+    return { say: o.say || "", ko: o.ko || "", repeat: o.repeat || "" };
+  } catch {
+    return { say: text.trim(), ko: "", repeat: "" };
+  }
+}
+
+// API는 user로 시작해야 하므로, 대화 시작 신호를 user 메시지로 넣는다.
+const START = "(대화를 시작해 줘)";
+const END = "(오늘은 여기까지 할게. 규칙 9번대로 마무리해 줘)";
+
+async function ask(userText) {
+  if (busy) return;
+  if (overLimit()) return note(`오늘 쓸 시간(${S.minutes}분)을 다 썼어요. 내일 또 만나요!`);
+  busy = true; setMic(false);
+  history.push({ role: "user", content: userText });
+  if (userText !== START && userText !== END) addMe(userText);
+  const thinking = note("…");
+  try {
+    const raw = await callAI(history);
+    const r = parseReply(raw);
+    history.push({ role: "assistant", content: JSON.stringify(r) });
+    saveHistory();
+    thinking.remove();
+    await addAI(r, true);
+  } catch (e) {
+    history.pop();
+    thinking.remove();
+    note("연결이 안 됐어요: " + e.message);
+  } finally {
+    busy = false; setMic(true);
+  }
+}
+
+// ---------- 화면 ----------
+const chat = $("chat");
+function scroll() { chat.scrollTop = chat.scrollHeight; }
+function note(t) { const d = document.createElement("div"); d.className = "note"; d.textContent = t; chat.appendChild(d); scroll(); return d; }
+function addMe(t) { const d = document.createElement("div"); d.className = "msg me"; d.textContent = t; chat.appendChild(d); scroll(); }
+
+async function addAI(r, live) {
+  const d = document.createElement("div"); d.className = "msg ai";
+  const fill = () => {
+    d.innerHTML = "";
+    const say = document.createElement("div"); say.className = "say"; say.textContent = r.say;
+    const btn = document.createElement("button"); btn.className = "replay"; btn.textContent = "🔊"; btn.title = "다시 듣기";
+    btn.onclick = () => speak(r.say);
+    say.appendChild(btn); d.appendChild(say);
+    if (S.showKo && r.ko) { const ko = document.createElement("div"); ko.className = "ko"; ko.textContent = r.ko; d.appendChild(ko); }
+    if (r.repeat && !r.say.includes(r.repeat)) {
+      const rp = document.createElement("div"); rp.className = "repeat"; rp.textContent = "🗣️ " + r.repeat;
+      rp.onclick = () => speak(r.repeat); d.appendChild(rp);
+    }
+  };
+  if (live && S.soundFirst) {
+    d.innerHTML = '<span class="hidden-text">🔊 듣는 중…</span>';
+    chat.appendChild(d); scroll();
+    await speak(r.say);
+    fill();
+  } else {
+    fill(); chat.appendChild(d);
+    if (live) await speak(r.say);
+  }
+  scroll();
+}
+
+function renderHistory() {
+  chat.innerHTML = "";
+  for (const m of history) {
+    if (m.role === "user") { if (m.content !== START && m.content !== END) addMe(m.content); }
+    else addAI(parseReply(m.content), false);
+  }
+}
+
+// ---------- 말하기(TTS) ----------
+function pickVoice(code) {
+  const vs = speechSynthesis.getVoices();
+  const base = code.split("-")[0];
+  return vs.find(v => v.lang === code && /natural|online|google/i.test(v.name))
+      || vs.find(v => v.lang === code) || vs.find(v => v.lang.startsWith(base));
+}
+function speak(text) {
+  return new Promise(resolve => {
+    if (!("speechSynthesis" in window) || !text) return resolve();
+    speechSynthesis.cancel();
+    // 큰따옴표 밖의 한국어 신호는 한국어 목소리로, 나머지는 배울 언어 목소리로 읽는다.
+    const parts = text.split(/([가-힣][가-힣\s?!.,~]*[가-힣?!~.]?)/).filter(s => s.trim());
+    const face = $("face"); face.classList.add("talking");
+    let i = 0;
+    const next = () => {
+      if (i >= parts.length) { face.classList.remove("talking"); return resolve(); }
+      const t = parts[i++];
+      const ko = /[가-힣]/.test(t);
+      const u = new SpeechSynthesisUtterance(t.replace(/["“”]/g, ""));
+      const code = ko ? "ko-KR" : LANGS[S.lang];
+      u.lang = code; u.voice = pickVoice(code) || null;
+      u.rate = ko ? 1 : Number(S.rate) || 0.88;
+      // 브라우저가 onend를 안 보내는 경우가 있어, 넉넉한 시간 뒤엔 다음으로 넘어간다.
+      let done = false;
+      const go = () => { if (!done) { done = true; next(); } };
+      u.onend = go; u.onerror = go;
+      setTimeout(go, 2000 + t.length * 150 / u.rate);
+      speechSynthesis.speak(u);
+    };
+    next();
+  });
+}
+
+// ---------- 듣기(음성 인식) ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+function setMic(on) { $("mic").disabled = !on || overLimit(); }
+$("mic").onclick = () => {
+  if (!SR) return note("이 브라우저는 음성 인식이 안 돼요. 크롬이나 엣지에서 열어 주세요.");
+  if (rec) { rec.stop(); return; }
+  speechSynthesis.cancel();
+  rec = new SR();
+  rec.lang = micLang === "ko" ? "ko-KR" : LANGS[S.lang];
+  rec.interimResults = false;
+  rec.onresult = e => { const t = e.results[0][0].transcript.trim(); if (t) ask(t); };
+  rec.onerror = e => { if (e.error === "not-allowed") note("마이크가 막혀 있어요. 주소창 왼쪽 자물쇠에서 마이크를 허용해 주세요."); };
+  rec.onend = () => { rec = null; $("mic").classList.remove("listening"); };
+  $("mic").classList.add("listening");
+  rec.start();
+};
+$("langKo").onclick = () => { micLang = "ko"; $("langKo").classList.add("on"); $("langTarget").classList.remove("on"); };
+$("langTarget").onclick = () => { micLang = "target"; $("langTarget").classList.add("on"); $("langKo").classList.remove("on"); };
+
+$("sendBtn").onclick = () => { const t = $("text").value.trim(); if (t) { $("text").value = ""; ask(t); } };
+$("text").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) $("sendBtn").click(); });
+$("endBtn").onclick = () => { if (history.length) ask(END); };
+
+// ---------- 하루 시간 제한 ----------
+function today() { return new Date().toISOString().slice(0, 10); }
+function usage() { const u = store.get("aifriend.usage", {}); return u.day === today() ? u : { day: today(), sec: 0 }; }
+function overLimit() { return usage().sec >= Number(S.minutes) * 60; }
+setInterval(() => {
+  if (document.hidden || !history.length) return;
+  const u = usage(); u.sec += 10; store.set("aifriend.usage", u);
+  if (overLimit()) { setMic(false); }
+}, 10000);
+
+// ---------- 설정 ----------
+const FIELDS = ["who", "age", "lang", "level", "likes", "minutes", "name", "persona", "repeat", "rate", "provider", "model", "key"];
+for (const k of Object.keys(LANGS)) { const o = document.createElement("option"); o.textContent = k; $("s_lang").appendChild(o); }
+function loadForm() {
+  FIELDS.forEach(k => $("s_" + k).value = S[k]);
+  $("s_showKo").checked = S.showKo; $("s_soundFirst").checked = S.soundFirst;
+  $("modelHint").textContent = MODELS[S.provider].hint;
+}
+$("s_provider").onchange = e => { $("s_model").value = MODELS[e.target.value].model; $("modelHint").textContent = MODELS[e.target.value].hint; };
+$("openSettings").onclick = () => { loadForm(); $("settings").classList.add("open"); };
+$("saveSettings").onclick = () => {
+  const langChanged = S.lang !== $("s_lang").value;
+  FIELDS.forEach(k => S[k] = $("s_" + k).value.trim());
+  S.showKo = $("s_showKo").checked; S.soundFirst = $("s_soundFirst").checked;
+  store.set("aifriend.settings", S);
+  if (S.key && demoOff()) { history = []; saveHistory(); chat.innerHTML = ""; }
+  $("settings").classList.remove("open");
+  applyHeader();
+  if (langChanged) { history = []; saveHistory(); chat.innerHTML = ""; }
+  else renderHistory();
+  if (!history.length) ask(START);
+};
+$("resetChat").onclick = () => { history = []; saveHistory(); chat.innerHTML = ""; };
+function saveHistory() { store.set("aifriend.history", history.slice(-60)); }
+function applyHeader() {
+  $("friendName").textContent = S.name || "친구";
+  $("sub").textContent = `${S.lang} 연습 친구 · AI`;
+  $("langTarget").textContent = `${S.lang}로 말하기`;
+  $("face").textContent = S.who === "아이" ? "🐻" : "🙂";
+}
+
+
+// ---------- 체험 모드(포트폴리오 사본에만 덧붙임): 키가 없으면 정해진 대화로 돈다 ----------
+const DEMO = [
+  {say: "Hi! I'm Emma. How was your day?", ko: "안녕! 나는 Emma야. 오늘 하루 어땠어?", repeat: "", hint: "오늘 좋았어!"},
+  {say: 'Oh, nice! 따라 해 볼까? "I had a good day."', ko: '오, 좋다! 따라 해 볼까? "좋은 하루였어."', repeat: "I had a good day.", hint: "I had a good day."},
+  {say: "Great! What did you eat today?", ko: "잘했어! 오늘 뭐 먹었어?", repeat: "", hint: "점심에 국수 먹었어"},
+  {say: 'Yum! 이렇게 말해 볼래? "I ate noodles for lunch."', ko: '맛있겠다! 이렇게 말해 볼래? "점심으로 국수 먹었어."', repeat: "I ate noodles for lunch.", hint: "I ate noodles for lunch."},
+  {say: "Perfect! Do you like cooking?", ko: "완벽해! 요리 좋아해?", repeat: "", hint: "응, 요리 좋아해"},
+  {say: 'Me too! 따라 해 볼까? "I like cooking."', ko: '나도! 따라 해 볼까? "나는 요리를 좋아해."', repeat: "I like cooking.", hint: "I like cooking."},
+  {say: "Wow, you're doing great!", ko: "와, 정말 잘하고 있어! (체험 대화는 여기까지예요. 위의 '제대로 해 보기'에서 키를 넣으면 진짜 AI와 이어서 이야기해요.)", repeat: "", hint: ""}
+];
+const DEMO_END = {say: 'Good job today! "I had a good day." "I ate noodles for lunch." "I like cooking." 하나 써 볼래?',
+  ko: "오늘 잘했어! 오늘 쓴 문장 세 개야. 하나 써 볼래?", repeat: ""};
+let demoOn = false;
+function demoReply(messages) {
+  const last = messages[messages.length - 1].content;
+  const r = last === END ? DEMO_END : DEMO[Math.min(messages.filter(m => m.role === "assistant").length, DEMO.length - 1)];
+  return new Promise(res => setTimeout(() => { demoHint(r.hint || ""); res(JSON.stringify({say: r.say, ko: r.ko, repeat: r.repeat})); }, 900));
+}
+let hintSeq = 0;
+function demoHint(t, seq = ++hintSeq) {  // 답을 다 읽어 줄 때까지(busy) 기다렸다가 보인다. 그 전에 누르면 ask 가 무시한다.
+  const h = $("demoHint"); if (!h || seq !== hintSeq) return;
+  h.innerHTML = ""; if (!t) return;
+  if (busy) return setTimeout(() => demoHint(t, seq), 200);
+  const b = document.createElement("button"); b.textContent = "추천 말: " + t;
+  b.onclick = () => { h.innerHTML = ""; ask(t); }; h.appendChild(b);
+}
+function demoStart() {
+  demoOn = true;
+  const bar = document.createElement("div"); bar.id = "demoBar";
+  bar.innerHTML = "<span>체험 모드 · 정해진 대화가 나와요</span><button>제대로 해 보기</button>";
+  bar.querySelector("button").onclick = () => { loadForm(); $("settings").classList.add("open"); $("s_key").focus(); };
+  chat.before(bar);
+  const hint = document.createElement("div"); hint.id = "demoHint"; $("sendBtn").closest("footer").prepend(hint);
+  history = []; chat.innerHTML = "";
+  ask(START);
+}
+function demoOff() {
+  if (!demoOn) return false;
+  demoOn = false; $("demoBar").remove(); $("demoHint").remove();
+  return true;
+}
+
+// ---------- 시작 ----------
+window.speechSynthesis?.getVoices();
+applyHeader();
+if (!S.key) { demoStart(); }
+else { renderHistory(); if (!history.length) ask(START); }
+setMic(true);
+</script>
+</body>
+</html>
